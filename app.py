@@ -5,7 +5,6 @@ from classify import classify_lion
 import os
 
 import bottle as app
-import slugify
 
 import config
 
