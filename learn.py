@@ -1,23 +1,23 @@
 from os.path import exists, isdir, basename, join, splitext
 from glob import glob
-from numpy import zeros, resize, sqrt, hstack, vstack, savetxt, zeros_like, uint8, histogram
-import scipy.cluster.vq as vq
-import libsvm
 from pickle import dump, load, HIGHEST_PROTOCOL
 import argparse
-import cv2
 import os
+
+from numpy import zeros, resize, sqrt, hstack, vstack, savetxt, zeros_like, uint8, histogram
+import scipy.cluster.vq as vq
+import cv2
 from skimage.feature import local_binary_pattern
 import matplotlib.pyplot as plt
 
-EXTENSIONS = [".jpeg", ".jpg", ".bmp", ".png", ".pgm", ".tif", ".tiff"]
-DATASETPATH = 'testdata_female'
-FEATUREPATH = 'feature_files'
+import libsvm
+import settings
+
 PRE_ALLOCATION_BUFFER = 1000  # for ORB
 HISTOGRAMS_FILE = 'trainingdata.svm'
-K_THRESH = 1  # early stopping threshold for kmeans originally at 1e-5, increased for speedup
+K_THRESH = 10  # early stopping threshold for kmeans originally at 1e-5, increased for speedup
 CODEBOOK_FILE = 'codebook.file'
-DETECTOR = "ORB"  # set feature detector type
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='train a visual bag of words model')
@@ -39,7 +39,7 @@ def get_imgfiles(path):
     all_files = []
     all_files.extend([join(path, basename(fname))
                       for fname in glob(path + "/*")
-                      if splitext(fname)[-1].lower() in EXTENSIONS])
+                      if splitext(fname)[-1].lower() in settings.EXTENSIONS])
     return all_files
 
 
@@ -84,11 +84,12 @@ def process_image(my_feature, imgfname):
 
     return featurevec
 
+
 def extract_features(input_files, my_feature):
     print("extracting " + my_feature + " features")
     all_features_dict = {}
     for i, fname in enumerate(input_files):
-        features_fname = os.path.join(FEATUREPATH, os.path.basename(fname) + '.' + my_feature)
+        features_fname = os.path.join(settings.FEATUREPATH, os.path.basename(fname) + '.' + my_feature)
         if not exists(features_fname):
             open(features_fname, 'w').close()
             print("calculating " + my_feature + " features for", fname)
@@ -160,7 +161,7 @@ def writeHistogramsToFile(nwords, labels, fnames, all_word_histgrams, features_f
 
 if __name__ == '__main__':
     print("---------------------")
-    print("## loading the images and extracting the " + DETECTOR + " features")
+    print("## loading the images and extracting the " + settings.DETECTOR + " features")
     args = parse_arguments()
     datasetpath = args.d
     cats = get_categories(datasetpath)
@@ -178,7 +179,7 @@ if __name__ == '__main__':
     for cat, label in zip(cats, list(range(ncats))):
         cat_path = join(datasetpath, cat)
         cat_files = get_imgfiles(cat_path)
-        cat_features = extract_features(cat_files, DETECTOR)
+        cat_features = extract_features(cat_files, settings.DETECTOR)
         all_files = all_files + cat_files
         all_features.update(cat_features)
         cat_label[cat] = label
@@ -187,7 +188,7 @@ if __name__ == '__main__':
 
     print("---------------------")
     print("## computing the visual words via k-means")
-    if DETECTOR == "LBP":
+    if settings.DETECTOR == "LBP":
         all_features_array = dict2numpy_featurevec(all_features)
     else:
         all_features_array = dict2numpy_kps(all_features)
@@ -197,7 +198,7 @@ if __name__ == '__main__':
                                      nclusters,
                                      thresh=K_THRESH)
 
-    with open(datasetpath + CODEBOOK_FILE, 'wb') as f:
+    with open(os.path.join(settings.RESULTSPATH, datasetpath + CODEBOOK_FILE), 'wb') as f:
 
         dump(codebook, f, protocol=HIGHEST_PROTOCOL)
 
@@ -214,11 +215,11 @@ if __name__ == '__main__':
                           all_files_labels,
                           all_files,
                           all_word_histgrams,
-                          datasetpath + HISTOGRAMS_FILE)
+                          os.path.join(settings.RESULTSPATH, datasetpath + HISTOGRAMS_FILE))
 
     print("---------------------")
     print("## train svm")
-    c, g, rate, model_file = libsvm.grid(datasetpath + HISTOGRAMS_FILE,
+    c, g, rate, model_file = libsvm.grid(os.path.join(settings.RESULTSPATH, datasetpath + HISTOGRAMS_FILE),
                                          png_filename='grid_res_img_file.png')
 
     print("--------------------")
