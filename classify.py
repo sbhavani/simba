@@ -8,6 +8,9 @@ CODEBOOK_FILE = 'testdatacodebook.file'
 MODEL_FILE = 'testdatatrainingdata.svm.model'
 DETECTOR = "ORB"  # set feature detector type
 
+int2lion = {0:'Ambogga', 3:'Masusu', 4:'Oyayai_(Lorpolosie)', 2:'Maringa', 1:'Kasayio'}
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='classify images with a visual bag of words model')
     parser.add_argument('-c', help='path to the codebook file', required=False, default=CODEBOOK_FILE)
@@ -54,4 +57,5 @@ writeHistogramsToFile(nclusters,
 
 print("---------------------")
 print("## test data with svm")
-print(libsvm.test(HISTOGRAMS_FILE, model_file))
+result = libsvm.test(HISTOGRAMS_FILE, model_file)
+print('Predicted Lion: \n' + int2lion[result[0]])

@@ -95,10 +95,8 @@ Addapted from easy.py contained in the LIBSVM packet by Chih-Chung Chang and Chi
 [3]: https://github.com/shackenberg/Minimal-Bag-of-Visual-Words-Image-Classifier/blob/master/learn.py
 [4]: https://github.com/shackenberg/Minimal-Bag-of-Visual-Words-Image-Classifier/blob/master/classify.py
 
-
-category      ==>  label
-Masusu        ==>      3
-Oyayai_(Lorpolosie) ==>      4
-Maringa       ==>      2
-Kasayio       ==>      1
-Ambogga       ==>      0
+Results
+=====================================
+75% for females
+61% for males
+53% for combined

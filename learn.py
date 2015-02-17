@@ -11,7 +11,7 @@ from skimage.feature import local_binary_pattern
 import matplotlib.pyplot as plt
 
 EXTENSIONS = [".jpeg", ".jpg", ".bmp", ".png", ".pgm", ".tif", ".tiff"]
-DATASETPATH = 'testdata'
+DATASETPATH = 'testdata_female'
 FEATUREPATH = 'feature_files'
 PRE_ALLOCATION_BUFFER = 1000  # for ORB
 HISTOGRAMS_FILE = 'trainingdata.svm'
@@ -88,7 +88,7 @@ def extract_features(input_files, my_feature):
     print("extracting " + my_feature + " features")
     all_features_dict = {}
     for i, fname in enumerate(input_files):
-        features_fname = os.path.join(FEATUREPATH, fname + '.' + my_feature)
+        features_fname = os.path.join(FEATUREPATH, os.path.basename(fname) + '.' + my_feature)
         if not exists(features_fname):
             open(features_fname, 'w').close()
             print("calculating " + my_feature + " features for", fname)
