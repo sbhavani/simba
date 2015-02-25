@@ -53,3 +53,7 @@ docs/_build/
 
 # PyBuilder
 target/
+
+testdata_female
+testdata_male
+venv
