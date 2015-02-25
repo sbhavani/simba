@@ -7,10 +7,13 @@ import os
 from numpy import zeros, resize, sqrt, hstack, vstack, savetxt, zeros_like, uint8, histogram
 import scipy.cluster.vq as vq
 import cv2
-from skimage.feature import local_binary_pattern
 import matplotlib.pyplot as plt
 
-import libsvm
+# ML libraries
+from sklearn.ensemble import RandomForestClassifier
+from sklearn import cross_validation
+from skimage.feature import local_binary_pattern
+
 import settings
 
 PRE_ALLOCATION_BUFFER = 1000  # for ORB
@@ -218,14 +221,24 @@ if __name__ == '__main__':
                           os.path.join(settings.RESULTSPATH, datasetpath + HISTOGRAMS_FILE))
 
     print("---------------------")
-    print("## train svm")
-    c, g, rate, model_file = libsvm.grid(os.path.join(settings.RESULTSPATH, datasetpath + HISTOGRAMS_FILE),
-                                         png_filename='grid_res_img_file.png')
+    print("## train randomforest")
+    clf = RandomForestClassifier(n_jobs=2)
 
-    print("--------------------")
-    print("## outputting results")
-    print("model file: " + datasetpath + model_file)
-    print("codebook file: " + datasetpath + CODEBOOK_FILE)
-    print("category      ==>  label")
-    for cat in cat_label:
-        print('{0:13} ==> {1:6d}'.format(cat, cat_label[cat]))
+    X_train, X_test, y_train, y_test = cross_validation.train_test_split(
+        all_features_array,
+        all_files_labels,
+        test_size=0.6,
+        random_state=0
+    )
+    clf.fit(X_train, y_train)
+
+    num_folds = 10
+    scores = cross_validation.cross_val_score(
+        clf,
+        all_features_array,
+        all_files_labels,
+        cv=num_folds
+    )
+
+    acc = round((sum(scores) / num_folds) * 100, 2)
+    print("Average " + str(num_folds) + "-fold accuracy: " + str(acc))
