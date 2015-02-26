@@ -4,27 +4,20 @@ from pickle import dump, load, HIGHEST_PROTOCOL
 import argparse
 import os
 
-from numpy import zeros, resize, sqrt, hstack, vstack, savetxt, zeros_like, uint8, histogram
+from numpy import zeros, resize, hstack, vstack, savetxt, zeros_like, uint8, histogram
 import scipy.cluster.vq as vq
 import cv2
 import matplotlib.pyplot as plt
 
 # ML libraries
-from sklearn.ensemble import RandomForestClassifier
-from sklearn import cross_validation
 from skimage.feature import local_binary_pattern
 
 import settings
 
-PRE_ALLOCATION_BUFFER = 1000  # for ORB
-HISTOGRAMS_FILE = 'trainingdata.svm'
-K_THRESH = 10  # early stopping threshold for kmeans originally at 1e-5, increased for speedup
-CODEBOOK_FILE = 'codebook.file'
-
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='train a visual bag of words model')
-    parser.add_argument('-d', help='path to the dataset', required=False, default=DATASETPATH)
+    parser.add_argument('-d', help='path to the dataset', required=False, default=settings.DATASETPATH)
     args = parser.parse_args()
     return args
 
@@ -59,7 +52,7 @@ def get_detector(my_detector):
 
 def get_gray_img(img_fname):
     image_name, extension = os.path.splitext(img_fname)
-
+    print(img_fname)
     if extension == ".tif":
         color_img = plt.imread(img_fname)
         gray_img = uint8(color_img)
@@ -114,7 +107,7 @@ def dict2numpy_kps(my_dict):
     nwords = list(my_dict.values())[0].shape[1]
     if nwords > 64:
         nwords = 64
-    array = zeros((nkeys * PRE_ALLOCATION_BUFFER, nwords))
+    array = zeros((nkeys * settings.PRE_ALLOCATION_BUFFER, nwords))
     pivot = 0
     for key in list(my_dict.keys()):
         value = my_dict[key]
@@ -160,85 +153,3 @@ def writeHistogramsToFile(nwords, labels, fnames, all_word_histgrams, features_f
     for i in range(nwords):
         fmt = fmt + str(i) + ':%f '
     savetxt(features_fname, data_rows, fmt)
-
-
-if __name__ == '__main__':
-    print("---------------------")
-    print("## loading the images and extracting the " + settings.DETECTOR + " features")
-    args = parse_arguments()
-    datasetpath = args.d
-    cats = get_categories(datasetpath)
-    ncats = len(cats)
-    print("searching for folders at " + datasetpath)
-    if ncats < 1:
-        raise ValueError('Only ' + str(ncats) + ' categories found. Wrong path?')
-    print("found following folders / categories:")
-    print(cats)
-    print("---------------------")
-    all_files = []
-    all_files_labels = {}
-    all_features = {}
-    cat_label = {}
-    for cat, label in zip(cats, list(range(ncats))):
-        cat_path = join(datasetpath, cat)
-        cat_files = get_imgfiles(cat_path)
-        cat_features = extract_features(cat_files, settings.DETECTOR)
-        all_files = all_files + cat_files
-        all_features.update(cat_features)
-        cat_label[cat] = label
-        for i in cat_files:
-            all_files_labels[i] = label
-
-    print("---------------------")
-    print("## computing the visual words via k-means")
-    if settings.DETECTOR == "LBP":
-        all_features_array = dict2numpy_featurevec(all_features)
-    else:
-        all_features_array = dict2numpy_kps(all_features)
-    nfeatures = all_features_array.shape[0]
-    nclusters = int(sqrt(nfeatures))
-    codebook, distortion = vq.kmeans(all_features_array,
-                                     nclusters,
-                                     thresh=K_THRESH)
-
-    with open(os.path.join(settings.RESULTSPATH, datasetpath + CODEBOOK_FILE), 'wb') as f:
-
-        dump(codebook, f, protocol=HIGHEST_PROTOCOL)
-
-    print("---------------------")
-    print("## compute the visual words histograms for each image")
-    all_word_histgrams = {}
-    for imagefname in all_features:
-        word_histgram = computeHistograms(codebook, all_features[imagefname])
-        all_word_histgrams[imagefname] = word_histgram
-
-    print("---------------------")
-    print("## write the histograms to file to pass it to the svm")
-    writeHistogramsToFile(nclusters,
-                          all_files_labels,
-                          all_files,
-                          all_word_histgrams,
-                          os.path.join(settings.RESULTSPATH, datasetpath + HISTOGRAMS_FILE))
-
-    print("---------------------")
-    print("## train randomforest")
-    clf = RandomForestClassifier(n_jobs=2)
-
-    X_train, X_test, y_train, y_test = cross_validation.train_test_split(
-        all_features_array,
-        all_files_labels,
-        test_size=0.6,
-        random_state=0
-    )
-    clf.fit(X_train, y_train)
-
-    num_folds = 10
-    scores = cross_validation.cross_val_score(
-        clf,
-        all_features_array,
-        all_files_labels,
-        cv=num_folds
-    )
-
-    acc = round((sum(scores) / num_folds) * 100, 2)
-    print("Average " + str(num_folds) + "-fold accuracy: " + str(acc))

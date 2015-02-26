@@ -1,7 +1,6 @@
 import argparse
 from pickle import load
 
-import libsvm
 from learn import extract_features, computeHistograms, writeHistogramsToFile
 import settings
 
@@ -50,7 +49,6 @@ def classify_lion(fnames):
 
     print("---------------------")
     print("## test data with svm")
-    result = libsvm.test(settings.HISTOGRAMS_FILE, model_file)
 
     return settings.int2lion[result[0]]
 
@@ -86,13 +84,15 @@ if __name__ == '__main__':
     print("---------------------")
     print("## write the histograms to file to pass it to the svm")
     nclusters = codebook.shape[0]
-    writeHistogramsToFile(nclusters,
-                          all_files_labels,
-                          fnames,
-                          all_word_histgrams,
-                          settings.HISTOGRAMS_FILE)
 
     print("---------------------")
-    print("## test data with svm")
-    result = libsvm.test(settings.HISTOGRAMS_FILE, model_file)
-    print('Predicted Lion: \n' + int2lion[result[0]])
+    print("## load classifier")
+    clf = load('model.rf')
+
+    print("---------------------")
+    print("## test data with classifier")
+    result_list = []
+    for imagefname in all_features:
+        result = clf.predict(all_word_histgrams[imagefname])
+        result_list.append(result)
+        print('Predicted Lion: \n' + settings.int2lion[result[0]])

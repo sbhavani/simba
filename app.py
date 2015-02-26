@@ -1,12 +1,22 @@
-from bottle import get, run, static_file
+from bottle import get, run, static_file, route, template, request
 
 from classify import classify_lion
 
 import os
 
-import bottle as app
-
 import config
+
+# Global Variables
+# original dataset
+DATASETPATH = 'testset'
+# features extracted from each superpixel
+FEATUREPATH = 'feature_files'
+# labels for patient data
+LABELSPATH = 'label_files'
+# segmentation files
+SEGPATH = 'segmentation_files'
+
+ALL_PATHS = [DATASETPATH, FEATUREPATH, LABELSPATH, SEGPATH]
 
 upload_dir = 'uploads'
 result = ''
@@ -32,18 +42,18 @@ def fonts(filename):
     return static_file(filename, root='static/fonts')
 
 
-@app.route('/')
+@route('/')
 def index():
     tpl = '{base}/index.tpl'.format(base=config.PAGES)
-    return app.template(tpl)
+    return template(tpl)
 
 
-@app.route('/upload<:re:/?>', method=['GET', 'POST'])
+@route('/upload<:re:/?>', method=['GET', 'POST'])
 def upload():
     tpl = '{base}/upload.tpl'.format(base=config.PAGES)
     tpl_json = dict(
-        file=app.request.files.get('file'),
-        upload=app.request.forms.get('upload'),
+        file=request.files.get('file'),
+        upload=request.forms.get('upload'),
         file_name='',
         error=''
     )
@@ -91,32 +101,17 @@ def upload():
 
                 tpl_json['lion'] = lion_pred
 
-    return app.template(tpl, tpl_json)
-
-
-# @post('/upload')
-# def do_upload():
-#     lion = request.files
-#
-#     # add this line
-#     data = request.files.data
-#
-#     print(lion, type(lion))
-#
-#     if lion is not None:
-#         file = lion.file
-#         print(file.filename, type(file))
-#         target_path = os.path.join(upload_dir, file.filename)
-#
-#         file.save(target_path)
-#
-#         lion_pred = classify_lion([target_path])
-#     else:
-#         return "<p>Invalid lion.</p>"
+    return template(tpl, tpl_json)
 
 
 if __name__ == '__main__':
     port = os.environ.get('PORT', 8080)
+
+    print("---------------------")
+    print("## Creating directories")
+    for curr_path in ALL_PATHS:
+        if not os.path.exists(curr_path):
+            os.makedirs(curr_path)
 
     # Run the app.
     run(host='0.0.0.0', port=port)
