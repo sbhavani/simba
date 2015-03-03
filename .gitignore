@@ -54,6 +54,7 @@ docs/_build/
 # PyBuilder
 target/
 
-testdata_female
-testdata_male
+# Test data and model files
+feature_files
+testdata*
 venv

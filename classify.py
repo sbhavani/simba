@@ -1,8 +1,9 @@
 import argparse
 from pickle import load
 
-from learn import extract_features, computeHistograms, writeHistogramsToFile
+from learn import extract_features, computeHistograms
 import settings
+
 
 def parse_arguments():
     parser = argparse.ArgumentParser(description='classify images with a visual bag of words model')

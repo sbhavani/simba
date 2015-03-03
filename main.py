@@ -10,10 +10,10 @@ import scipy.cluster.vq as vq
 from sklearn.ensemble import RandomForestClassifier
 from sklearn import cross_validation
 
-# SemanticMD libraries
+# user-defined libraries
 import settings
 from learn import get_categories, get_imgfiles, extract_features, \
-    dict2numpy_featurevec, dict2numpy_kps, computeHistograms
+    dict2numpy_featurevec, dict2numpy_kps, is_kp_descriptor
 
 
 print("---------------------")
@@ -43,10 +43,11 @@ for cat, label in zip(cats, list(range(ncats))):
 
 print("---------------------")
 print("## computing the visual words via k-means")
-if settings.DETECTOR == "LBP":
-    all_features_array = dict2numpy_featurevec(all_features)
-else:
+if is_kp_descriptor(settings.DETECTOR):
     all_features_array = dict2numpy_kps(all_features)
+else:
+    all_features_array = dict2numpy_featurevec(all_features)
+
 nfeatures = all_features_array.shape[0]
 nclusters = int(sqrt(nfeatures))
 codebook, distortion = vq.kmeans(all_features_array,

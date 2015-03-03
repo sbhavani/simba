@@ -3,18 +3,35 @@ from glob import glob
 from pickle import dump, load, HIGHEST_PROTOCOL
 import argparse
 import os
-
-from numpy import zeros, resize, hstack, vstack, savetxt, zeros_like, uint8, histogram
-import scipy.cluster.vq as vq
-import cv2
-import matplotlib.pyplot as plt
+import numpy
 
 # ML libraries
-from skimage.feature import local_binary_pattern
+from skimage.feature import (
+    greycomatrix, greycoprops, hog, local_binary_pattern, daisy
+)
+import scipy.cluster.vq as vq
 
+# CV libraries
+import cv2
+from PIL import Image, ImageOps
+
+# user-defined libraries
 import settings
 
 
+# private functions
+def _get_detector(my_detector):
+    if my_detector == "ORB":
+        return cv2.ORB_create()
+    if my_detector == "BRISK":
+        return cv2.BRISK_create()
+    if my_detector == "KAZE":
+        return cv2.KAZE_create()
+    if my_detector == "AKAZE":
+        return cv2.AKAZE_create()
+
+
+# public functions
 def parse_arguments():
     parser = argparse.ArgumentParser(description='train a visual bag of words model')
     parser.add_argument('-d', help='path to the dataset', required=False, default=settings.DATASETPATH)
@@ -39,43 +56,126 @@ def get_imgfiles(path):
     return all_files
 
 
-def get_detector(my_detector):
-    if my_detector == "ORB":
-        return cv2.ORB_create()
-    if my_detector == "BRISK":
-        return cv2.BRISK_create()
-    if my_detector == "KAZE":
-        return cv2.KAZE_create()
-    if my_detector == "AKAZE":
-        return cv2.AKAZE_create()
+def is_kp_descriptor(my_detector):
+    return my_detector in settings.detector_types
+
+
+def compute_feats_daisy(file_hash):
+    my_gray_img = get_gray_img(file_hash)
+
+    # TODO: change settings to reduce dimensionality
+    descs, descs_img = daisy(my_gray_img, step=180, radius=58, rings=2, histograms=6,
+                             orientations=8, visualize=True)
+
+    return descs
+
+
+def compute_feats_hog(file_hash):
+    """
+    Extract HOG features
+      my_imgfname: image filename
+
+    Reference: http://www.vlfeat.org/overview/hog.html
+    """
+    my_gray_img = get_gray_img(file_hash)
+
+    featvec = hog(my_gray_img,
+                  orientations=12,
+                  pixels_per_cell=(6, 6),
+                  cells_per_block=(3, 3),
+                  visualise=False,
+                  normalise=True)
+
+    featvec, _ = numpy.histogram(featvec, bins=50)
+
+    return featvec
+
+
+def compute_feats_detector(img_fname, my_feature):
+    """
+    Extract keypoint detector features given an image
+      my_img: numpy matrix representing an image
+
+    Reference: http://www.vlfeat.org/api/sift.html
+    """
+
+    if my_feature == 'DAISY':
+        return compute_feats_daisy(img_fname)
+
+    # convert to grayscale to drop the 3rd dim
+    my_gray_img = get_gray_img(img_fname)
+
+    detector = _get_detector(my_feature)
+    kps, descriptors = detector.detectAndCompute(my_gray_img, None)
+
+    return descriptors
+
+
+def compute_feats_lbp(img_fname):
+    """
+    Extract local binary pattern (LBP) features
+      my_imgfname: image filename
+
+    """
+    my_gray_img = get_gray_img(img_fname)
+
+    # settings for LBP
+    radius = 8
+    n_points = 8 * radius
+    lbp_method = 'uniform'
+    lbp = local_binary_pattern(my_gray_img, n_points, radius, lbp_method)
+    n_bins = lbp.max() + 1
+    featurevec, _ = numpy.histogram(lbp, normed=True, bins=n_bins, range=(0, n_bins))
+
+    return featurevec
+
+
+def compute_feats_glcm(imgfname):
+    """
+
+    Extract GLCM features
+    Reference: http://www.fp.ucalgary.ca/mhallbey/tutorial.htm
+    """
+
+    grayimg = get_gray_img(imgfname)
+
+    num_feats = 6
+    featvec = numpy.zeros((1, num_feats))
+
+    glcm = greycomatrix(
+        grayimg, [1, 2], [0, numpy.pi / 2],
+        levels=256,
+        symmetric=True,
+        normed=True)
+
+    featvec[0, 0] = greycoprops(glcm, 'contrast')[0][0]
+    featvec[0, 1] = greycoprops(glcm, 'energy')[0][0]
+    featvec[0, 2] = greycoprops(glcm, 'homogeneity')[0][0]
+    featvec[0, 3] = greycoprops(glcm, 'correlation')[0][0]
+    featvec[0, 4] = greycoprops(glcm, 'ASM')[0][0]
+    featvec[0, 5] = greycoprops(glcm, 'dissimilarity')[0][0]
+
+    return featvec[0, :]
 
 
 def get_gray_img(img_fname):
-    image_name, extension = os.path.splitext(img_fname)
-    print(img_fname)
-    if extension == ".tif":
-        color_img = plt.imread(img_fname)
-        gray_img = uint8(color_img)
-    else:
-        img = cv2.imread(img_fname)
-        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    input = Image.open(img_fname)
+    output = ImageOps.grayscale(input)
 
-    return gray_img
+    return output
 
 
 def process_image(my_feature, imgfname):
     gray = get_gray_img(imgfname)
 
     if my_feature == "LBP":
-        # settings for LBP
-        radius = 5
-        n_points = 8 * radius
-        lbp_method = 'uniform'
-        lbp = local_binary_pattern(gray, n_points, radius, lbp_method)
-        n_bins = lbp.max() + 1
-        featurevec, _ = histogram(lbp, normed=True, bins=n_bins, range=(0, n_bins))
+        featurevec = compute_feats_lbp(imgfname)
+    elif my_feature == 'GLCM':
+        featurevec = compute_feats_glcm(imgfname)
+    elif my_feature == 'HOG':
+        featurevec = compute_feats_hog(imgfname)
     else:
-        detector = get_detector(my_feature)
+        detector = _get_detector(my_feature)
         locs, featurevec = detector.detectAndCompute(gray, None)
 
     return featurevec
@@ -107,49 +207,31 @@ def dict2numpy_kps(my_dict):
     nwords = list(my_dict.values())[0].shape[1]
     if nwords > 64:
         nwords = 64
-    array = zeros((nkeys * settings.PRE_ALLOCATION_BUFFER, nwords))
+    array = numpy.zeros((nkeys * settings.PRE_ALLOCATION_BUFFER, nwords))
     pivot = 0
     for key in list(my_dict.keys()):
         value = my_dict[key]
         if value is None:
-            print(key)
             continue
         nelements = value.shape[0]
         while pivot + nelements > array.shape[0]:
-            padding = zeros_like(array)
-            array = vstack((array, padding))
+            padding = numpy.zeros_like(array)
+            array = numpy.vstack((array, padding))
         array[pivot:pivot + nelements] = value
         pivot += nelements
-    array = resize(array, (pivot, nwords))
+    array = numpy.resize(array, (pivot, nwords))
     return array
 
 
 def dict2numpy_featurevec(my_dict):
     nkeys = len(my_dict)
-    array = vstack(tuple(list(my_dict.values())))
+    array = numpy.vstack(tuple(list(my_dict.values())))
     return array
 
 
 def computeHistograms(codebook, descriptors):
     code, dist = vq.vq(descriptors, codebook)
-    histogram_of_words, bin_edges = histogram(code,
-                                              bins=list(range(codebook.shape[0] + 1)),
-                                              normed=True)
+    histogram_of_words, bin_edges = numpy.histogram(code,
+                                                    bins=list(range(codebook.shape[0] + 1)),
+                                                    normed=True)
     return histogram_of_words
-
-
-def writeHistogramsToFile(nwords, labels, fnames, all_word_histgrams, features_fname):
-    data_rows = zeros(nwords + 1)  # +1 for the category label
-    for fname in fnames:
-        histogram = all_word_histgrams[fname]
-        if (histogram.shape[0] != nwords):  # scipy deletes empty clusters
-            nwords = histogram.shape[0]
-            data_rows = zeros(nwords + 1)
-            print('nclusters have been reduced to ' + str(nwords))
-        data_row = hstack((labels[fname], histogram))
-        data_rows = vstack((data_rows, data_row))
-    data_rows = data_rows[1:]
-    fmt = '%i '
-    for i in range(nwords):
-        fmt = fmt + str(i) + ':%f '
-    savetxt(features_fname, data_rows, fmt)
