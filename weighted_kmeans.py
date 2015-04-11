@@ -1,9 +1,5 @@
-import warnings
-
 from numpy.random import randint
-from numpy import shape, zeros, sqrt, argmin, minimum, array, \
-    newaxis, arange, compress, equal, common_type, take, \
-    std, mean, average
+from numpy import array, arange, compress, take, mean, average
 import numpy as np
 from scipy.cluster import vq
 
@@ -72,7 +68,7 @@ def kmeans(obs, k_or_guess, iter=20, thresh=1e-5, weights=None):
     Examples
     --------
     >>> from numpy import array
-    >>> from scipy.cluster.vq import vq, kmeans, whiten
+    >>> from scipy.cluster.vq import kmeans, whiten
     >>> features  = array([[ 1.9,2.3],
     ...                    [ 1.5,2.5],
     ...                    [ 0.8,0.6],
@@ -113,7 +109,7 @@ def kmeans(obs, k_or_guess, iter=20, thresh=1e-5, weights=None):
         if k < 1:
             raise ValueError("Asked for 0 cluster ? ")
         for i in range(iter):
-            #the intial code book is randomly selected from observations
+            # the intial code book is randomly selected from observations
             guess = take(obs, randint(0, No, k), 0)
             book, dist = _kmeans(obs, guess, thresh=thresh, weights=weights)
             if dist < best_dist:
@@ -166,20 +162,20 @@ def _kmeans(obs, guess, thresh=1e-5, weights=None):
         # compute membership and distances between obs and code_book
         obs_code, distort = vq.vq(obs, code_book)
         avg_dist.append(mean(distort, axis=-1))
-        #recalc code_book as centroids of associated obs
-        if (diff > thresh):
+        # recalc code_book as centroids of associated obs
+        if diff > thresh:
             has_members = []
             for i in arange(nc):
-                cell_members = compress(equal(obs_code, i), obs, 0)
+                cell_members = compress((obs_code == i), obs, 0)
                 if cell_members.shape[0] > 0:
                     if not weights:
                         code_book[i] = mean(cell_members, 0)
                     else:
                         code_book[i] = average(cell_members, 0, weights)
                     has_members.append(i)
-                    #remove code_books that didn't have any members
+                    # remove code_books that didn't have any members
             code_book = take(code_book, has_members, 0)
         if len(avg_dist) > 1:
             diff = avg_dist[-2] - avg_dist[-1]
-            #print avg_dist
+            # print avg_dist
     return code_book, avg_dist[-1]

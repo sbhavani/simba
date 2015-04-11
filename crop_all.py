@@ -1,7 +1,12 @@
 import os
+
 import cv2
-from utilities_lib import get_imgfiles
-from crop_img_lib.find_objects import process_image
+
+
+# SemanticMD libraries
+from utilities_lib import get_imgfiles, get_categories
+from find_objects import process_image
+import settings
 
 
 def show_results(img, center, radius):
@@ -31,18 +36,26 @@ def show_results(img, center, radius):
 
 
 if __name__ == '__main__':
-    for image in get_imgfiles('test_crops/Oyayai/'):
 
-        img_fname = 'c_' + os.path.basename(image) + '.jpg'
+    # iterate through all the categories (each folder in datasetpath)
+    for cat in get_categories(settings.DATASETPATH):
+        cat_dir = os.path.join(settings.DATASETPATH, cat)
+        # cropped images saved here
+        cat_dir_local = os.path.join(settings.RESULTSPATH, cat)
+        if not os.path.exists(cat_dir_local):
+            os.makedirs(cat_dir_local)
+        # iterate through all images for a category
+        for image in get_imgfiles(cat_dir):
+            img_fname = 'c_' + os.path.basename(image) + '.jpg'
 
-        img, center, radius, zoom_level = process_image(image, None)
+            img, center, radius, zoom_level = process_image(image, None)
 
-        # crop image
-        x1 = int(center[0] - radius)
-        y1 = int(center[1] - radius)
-        x2 = int(center[0] + radius)
-        y2 = int(center[1] + radius)
+            # crop image
+            x1 = int(center[0] - radius)
+            y1 = int(center[1] - radius)
+            x2 = int(center[0] + radius)
+            y2 = int(center[1] + radius)
 
-        roi = img[y1:y2, x1:x2, :]
+            roi = img[y1:y2, x1:x2, :]
 
-        cv2.imwrite(os.path.join('output', img_fname), roi)
+            cv2.imwrite(os.path.join(cat_dir_local, img_fname), roi)
