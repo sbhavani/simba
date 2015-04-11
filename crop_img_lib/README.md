@@ -1,0 +1,1 @@
+Naive way to detect salient (unknown) objects based ORB features and face detection algorithms.

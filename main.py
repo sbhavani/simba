@@ -89,4 +89,4 @@ with open(settings.MODEL_FILE, 'wb') as f:
 
 print("--------------------")
 print("## outputting results")
-print("model file: " + datasetpath + settings.MODEL_FILE)
+print("model file: " + join(datasetpath, settings.MODEL_FILE))
